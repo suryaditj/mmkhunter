@@ -37,7 +37,8 @@ def main() -> None:
     app.add_handler(CommandHandler("menu", bot_controller.main_menu_command))
     app.add_handler(CallbackQueryHandler(bot_controller.on_callback_query))
 
-    app.run_polling(drop_pending_updates=True, bootstrap_retries=-1)
+    # Retry bootstrap dibatasi (bukan -1) agar tidak loop tanpa henti saat 429
+    app.run_polling(drop_pending_updates=True, bootstrap_retries=3)
 
 
 if __name__ == "__main__":
