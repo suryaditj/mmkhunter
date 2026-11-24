@@ -51,17 +51,19 @@ def test_callback_length_and_keyboards():
     for action, mkt in [("home", None), ("mkt", "XAUUSD"), ("mkt", "BTCUSD"), ("ref", "XAUUSD"), ("chg", None), ("back", None)]:
         cb = build_callback(action, mkt)
         assert len(cb.encode("utf-8")) <= MAX_CALLBACK_BYTES
-        parsed_action, parsed_mkt, _ = parse_callback(cb)
+        parsed_action, parsed_mkt, _, parsed_mode = parse_callback(cb)
         assert parsed_action == action
         assert parsed_mkt == mkt
+        assert parsed_mode in ("mtf", "scp")
 
     main_kb = build_main_menu_keyboard()
     main_labels = [btn.text for row in main_kb.inline_keyboard for btn in row]
-    assert main_labels == ["🟡 XAUUSD", "₿ BTCUSD"]
+    assert main_labels == ["🟡 XAUUSD", "₿ BTCUSD", "⚡ Scalping XAUUSD", "⚡ Scalping BTCUSD"]
 
     res_kb = build_analysis_result_keyboard("XAUUSD")
     res_labels = [btn.text for row in res_kb.inline_keyboard for btn in row]
     assert res_labels == ["🔄 Refresh", "🔀 Ganti Market", "⬅️ Kembali", "🏠 Menu Utama"]
+
 
 
 def test_navigation_flow_refresh_persistence_and_multi_user():
