@@ -1,6 +1,9 @@
 name: Zone Hunter CI & Telegram Bot
 
 on:
+  schedule:
+    # Cek & nyalakan ulang sesi bot tiap 5 menit (UTC) jika sesi sebelumnya sudah selesai
+    - cron: "*/5 * * * *"
   push:
     branches: [ "main", "master" ]
   pull_request:
@@ -8,9 +11,9 @@ on:
   workflow_dispatch:
     inputs:
       run_duration_seconds:
-        description: "Durasi jalan bot dalam detik saat manual dispatch (default: 60)"
+        description: "Durasi jalan bot per sesi dalam detik (default: 18000 = 5 jam)"
         required: false
-        default: "60"
+        default: "18000"
       td_rate_limit:
         description: "Batas request Twelve Data per menit (default: 8)"
         required: false
@@ -18,7 +21,7 @@ on:
 
 concurrency:
   group: zone-hunter-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -47,10 +50,10 @@ jobs:
         run: python -m pytest -v
 
   run-bot:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: test
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 320
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,15 +69,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Telegram bot with bounded timeout
+      - name: Run Telegram bot for 5 hours with auto-restart via schedule
         env:
           PYTHONPATH: .
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TWELVE_DATA_API_KEY: ${{ secrets.TWELVE_DATA_API_KEY }}
-          TWELVE_DATA_RATE_LIMIT_PER_MIN: ${{ inputs.td_rate_limit }}
+          TWELVE_DATA_RATE_LIMIT_PER_MIN: ${{ github.event.inputs.td_rate_limit || '8' }}
+          RUN_DURATION_SEC: ${{ github.event.inputs.run_duration_seconds || '18000' }}
         run: |
           if [ -z "$TELEGRAM_BOT_TOKEN" ] || [ -z "$TWELVE_DATA_API_KEY" ]; then
             echo "Set TELEGRAM_BOT_TOKEN and TWELVE_DATA_API_KEY in GitHub Repository Secrets."
             exit 1
           fi
-          timeout --signal=INT "${{ inputs.run_duration_seconds }}" python run_telegram_bot.py || true
+          timeout --signal=INT "$RUN_DURATION_SEC" python run_telegram_bot.py || true
